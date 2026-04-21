@@ -1,0 +1,99 @@
+{
+  "name": "docusaurus-plugin-marginalia",
+  "version": "0.1.0",
+  "description": "Editorial sidenotes for Docusaurus: inline anchors paired with cards in the right margin that pack top-down and highlight as the reader scrolls.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "watch": "npm run dev",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "husky",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "docusaurus",
+    "docusaurus-plugin",
+    "marginalia",
+    "sidenotes",
+    "margin-notes",
+    "annotations"
+  ],
+  "author": "mcclowes",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcclowes/docusaurus-plugin-marginalia.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mcclowes/docusaurus-plugin-marginalia/issues"
+  },
+  "homepage": "https://github.com/mcclowes/docusaurus-plugin-marginalia#readme",
+  "peerDependencies": {
+    "@docusaurus/core": "^3.0.0",
+    "@docusaurus/types": "^3.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@docusaurus/core": "^3.0.0",
+    "@docusaurus/tsconfig": "^3.9.2",
+    "@docusaurus/types": "^3.9.2",
+    "@eslint/js": "^9.15.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.8.7",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^9.15.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "husky": "^9.1.7",
+    "jsdom": "^27.1.0",
+    "lint-staged": "^15.5.1",
+    "prettier": "^3.6.2",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.0.1",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.15.0",
+    "vitest": "^2.1.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
+  }
+}

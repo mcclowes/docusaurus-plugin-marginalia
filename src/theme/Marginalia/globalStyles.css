@@ -1,0 +1,19 @@
+/*
+ * When a page mounts <Marginalia>, we toggle body.marginalia-active.
+ * Hide the native Docusaurus TOC column and let the article widen into
+ * that space so the in-margin TOC and reference cards have room.
+ */
+
+body.marginalia-active [class*='tableOfContents'] {
+  display: none !important;
+}
+
+body.marginalia-active main.col.col--7,
+body.marginalia-active main[class*='col--7'] {
+  flex-grow: 1 !important;
+  max-width: none !important;
+}
+
+body.marginalia-active .container.margin-vert--lg > .row > [class*='col--2'] {
+  display: none !important;
+}
