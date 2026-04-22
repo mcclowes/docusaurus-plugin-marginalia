@@ -37,7 +37,9 @@ src/
     styles.module.css               # Scoped styles
     globalStyles.css                # Body-level layout overrides
     globalStylesLoader.ts           # Side-effect import for tsup copy emission
-tests/theme/Marginalia/             # Vitest component tests
+tests/
+  setup.ts                          # Vitest setup (jest-dom matchers, cleanup)
+  theme/Marginalia/                 # Vitest component tests
 ```
 
 ## Pull request process

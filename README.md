@@ -18,6 +18,20 @@ export default {
 };
 ```
 
+Or with options:
+
+```js
+export default {
+  plugins: [['docusaurus-plugin-marginalia', { enabled: true }]],
+};
+```
+
+### Plugin options
+
+| Option    | Type      | Default | Notes                                                                                                           |
+| --------- | --------- | ------- | --------------------------------------------------------------------------------------------------------------- |
+| `enabled` | `boolean` | `true`  | When `false`, the theme path is still registered so `@theme/Marginalia` resolves, but global styles are skipped |
+
 ## Usage
 
 Import the components from `@theme/Marginalia` in any MDX file and wrap prose
