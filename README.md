@@ -65,16 +65,17 @@ in-margin TOC and cards have room to breathe.
 
 Inline anchor paired with a margin card.
 
-| Prop        | Type        | Default             | Notes                                                                                                      |
-| ----------- | ----------- | ------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `anchor`    | `ReactNode` | `children`          | Inline text in prose (if omitted, children is used)                                                        |
-| `title`     | `string`    | —                   | Card heading                                                                                               |
-| `kind`      | `AsideKind` | `'note'`            | One of `note`, `concept`, `warning`, `info`, `link`, `value`, `code`, `endpoint` — drives the swatch color |
-| `kindLabel` | `string`    | derived from `kind` | Override the uppercase label                                                                               |
-| `meta`      | `string[]`  | —                   | Pill tags shown below body                                                                                 |
-| `cta`       | `string`    | —                   | Call-to-action text at bottom of card                                                                      |
-| `ctaHref`   | `string`    | —                   | CTA href. If omitted, renders as `<span>`                                                                  |
-| `children`  | `ReactNode` | —                   | Card body (when `anchor` is set) or inline anchor (when not)                                               |
+| Prop         | Type        | Default             | Notes                                                                                                      |
+| ------------ | ----------- | ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `anchor`     | `ReactNode` | `children`          | Inline text in prose (if omitted, children is used)                                                        |
+| `title`      | `string`    | —                   | Card heading                                                                                               |
+| `kind`       | `AsideKind` | `'note'`            | One of `note`, `concept`, `warning`, `info`, `link`, `value`, `code`, `endpoint` — drives the swatch color |
+| `kindLabel`  | `string`    | derived from `kind` | Override the uppercase label                                                                               |
+| `meta`       | `string[]`  | —                   | Pill tags shown below body                                                                                 |
+| `cta`        | `string`    | —                   | Call-to-action text at bottom of card                                                                      |
+| `ctaHref`    | `string`    | —                   | CTA href. If omitted, renders as `<span>`                                                                  |
+| `aria-label` | `string`    | —                   | Accessible name override, for when `anchor` content is non-textual (icons, complex JSX)                    |
+| `children`   | `ReactNode` | —                   | Card body (when `anchor` is set) or inline anchor (when not)                                               |
 
 ### `<Endpoint>`
 
@@ -100,8 +101,9 @@ Inline method + path chip. Colors:
 - Cards are absolutely positioned and packed top-down with a 10px gap.
 - Scroll selects the anchor nearest 32% of viewport height and marks both sides `hot`.
 - Hovering either side syncs the other. Clicking an anchor scrolls its card into view with a brief pulse.
-- Keyboard accessible: anchors have `role="button"`, `tabindex="0"`, respond to Enter/Space.
+- Keyboard accessible: anchors render as real `<button>` elements with `aria-describedby` pointing at their paired card (`role="note"`), so screen readers can announce card content when the anchor is focused. Enter/Space activate.
 - Below 1200px viewport width the margin column is hidden; anchors keep their native `title` tooltip.
+- Respects `prefers-reduced-motion`: transitions, imperative animations, and smooth scrolling are all disabled when the user opts out.
 
 ## Theming
 

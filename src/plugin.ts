@@ -1,47 +1,22 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { LoadContext, Plugin } from '@docusaurus/types';
 import type { MarginaliaOptions } from './types';
 
-const resolveGlobalStylesPath = () => {
-  try {
-    if (typeof __dirname === 'string') {
-      return join(__dirname, 'theme/Marginalia/globalStylesLoader.js');
-    }
-  } catch {
-    // fall through to ESM resolution
-  }
-  return fileURLToPath(new URL('./theme/Marginalia/globalStylesLoader.js', import.meta.url));
+const getModuleDir = (): string => {
+  if (typeof __dirname === 'string') return __dirname;
+  return dirname(fileURLToPath(import.meta.url));
 };
 
-const resolveThemePath = () => {
-  try {
-    if (typeof __dirname === 'string') {
-      return join(__dirname, 'theme');
-    }
-  } catch {
-    // fall through to ESM resolution
-  }
-  return fileURLToPath(new URL('./theme', import.meta.url));
-};
+const resolveGlobalStylesPath = (moduleDir: string) =>
+  join(moduleDir, 'theme/Marginalia/globalStylesLoader.js');
 
-const resolveTypeScriptThemePath = () => {
-  const candidates: string[] = [];
-  try {
-    if (typeof __dirname === 'string') {
-      candidates.push(join(__dirname, '../src/theme'));
-    }
-  } catch {
-    // fall through
-  }
-  if (typeof import.meta !== 'undefined' && typeof import.meta.url === 'string') {
-    candidates.push(fileURLToPath(new URL('../src/theme', import.meta.url)));
-  }
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return undefined;
+const resolveThemePath = (moduleDir: string) => join(moduleDir, 'theme');
+
+const resolveTypeScriptThemePath = (moduleDir: string): string | undefined => {
+  const candidate = join(moduleDir, '../src/theme');
+  return existsSync(candidate) ? candidate : undefined;
 };
 
 export default function marginaliaPlugin(
@@ -49,9 +24,17 @@ export default function marginaliaPlugin(
   options: MarginaliaOptions = {}
 ): Plugin<void> {
   const enabled = options.enabled ?? true;
-  const themePath = resolveThemePath();
-  const typeScriptThemePath = resolveTypeScriptThemePath();
-  const globalStylesPath = resolveGlobalStylesPath();
+  const moduleDir = getModuleDir();
+  const themePath = resolveThemePath(moduleDir);
+  const typeScriptThemePath = resolveTypeScriptThemePath(moduleDir);
+  const globalStylesPath = resolveGlobalStylesPath(moduleDir);
+
+  if (enabled && !existsSync(globalStylesPath)) {
+    throw new Error(
+      `[docusaurus-plugin-marginalia] Missing build artifact at ${globalStylesPath}. ` +
+        `Run \`npm run build\` in the plugin package before using it.`
+    );
+  }
 
   return {
     name: 'docusaurus-plugin-marginalia',

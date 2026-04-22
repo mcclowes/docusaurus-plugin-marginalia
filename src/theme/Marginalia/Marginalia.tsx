@@ -7,8 +7,32 @@ const GAP = 10;
 const READING_LINE = 0.32;
 const TOC_RESERVE = 34;
 const CASCADE_TOLERANCE = 60;
+const MAX_COMPACTION_ITERATIONS = 16;
 
-const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+// Module-level counter so concurrent Marginalia instances don't fight over
+// the body class. Body class flips off only when the last instance unmounts.
+let bodyClassRefCount = 0;
+
+const useIsomorphicLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect;
+
+const shallowArrayEqual = (a?: string[], b?: string[]): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+
+const asideValueEqual = (a: MarginaliaAside, b: Omit<MarginaliaAside, 'id' | 'cardId'>): boolean =>
+  a.kind === b.kind &&
+  a.kindLabel === b.kindLabel &&
+  a.title === b.title &&
+  a.body === b.body &&
+  a.cta === b.cta &&
+  a.ctaHref === b.ctaHref &&
+  shallowArrayEqual(a.meta, b.meta);
+
+const toCardId = (id: string) => `marginalia-card-${id.replace(/[:]/g, '_')}`;
 
 type Heading = {
   id: string;
@@ -43,25 +67,34 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
   const tocRef = useRef<HTMLElement | null>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const anchorRefs = useRef<Map<string, HTMLElement>>(new Map());
-  const asidesRef = useRef(asides);
-  asidesRef.current = asides;
-  const compactIdsRef = useRef(compactIds);
-  compactIdsRef.current = compactIds;
+  const asidesRef = useRef<MarginaliaAside[]>(asides);
+  const compactIdsRef = useRef<Set<string>>(compactIds);
 
-  const register = useCallback((id: string, data: Omit<MarginaliaAside, 'id'>) => {
+  useEffect(() => {
+    asidesRef.current = asides;
+  }, [asides]);
+  useEffect(() => {
+    compactIdsRef.current = compactIds;
+  }, [compactIds]);
+
+  const register = useCallback((id: string, data: Omit<MarginaliaAside, 'id' | 'cardId'>) => {
     setAsides(prev => {
       const idx = prev.findIndex(a => a.id === id);
       if (idx >= 0) {
+        if (asideValueEqual(prev[idx], data)) return prev;
         const next = prev.slice();
-        next[idx] = { id, ...data };
+        next[idx] = { ...prev[idx], ...data };
         return next;
       }
-      return [...prev, { id, ...data }];
+      return [...prev, { id, cardId: toCardId(id), ...data }];
     });
   }, []);
 
   const unregister = useCallback((id: string) => {
-    setAsides(prev => prev.filter(a => a.id !== id));
+    setAsides(prev => {
+      if (prev.every(a => a.id !== id)) return prev;
+      return prev.filter(a => a.id !== id);
+    });
     cardRefs.current.delete(id);
     anchorRefs.current.delete(id);
   }, []);
@@ -76,16 +109,38 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
     else cardRefs.current.delete(id);
   }, []);
 
-  const scrollCardIntoView = useCallback((id: string) => {
-    const cardEl = cardRefs.current.get(id);
-    if (!cardEl) return;
-    cardEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    cardEl.animate?.([{ transform: 'translateX(-10px)' }, { transform: 'translateX(-4px)' }], {
-      duration: 300,
-      easing: 'cubic-bezier(.2,.7,.2,1)',
-    });
-  }, []);
+  const getCardId = useCallback((id: string) => toCardId(id), []);
 
+  const prefersReducedMotion = useCallback(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    []
+  );
+
+  const scrollCardIntoView = useCallback(
+    (id: string) => {
+      const cardEl = cardRefs.current.get(id);
+      if (!cardEl) return;
+      cardEl.scrollIntoView({
+        block: 'center',
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      });
+      if (!prefersReducedMotion() && cardEl.animate) {
+        cardEl.animate([{ transform: 'translateX(-10px)' }, { transform: 'translateX(-4px)' }], {
+          duration: 300,
+          easing: 'cubic-bezier(.2,.7,.2,1)',
+        });
+      }
+    },
+    [prefersReducedMotion]
+  );
+
+  // positionCards computes desired top for each visible card and, on overflow
+  // or cascade, picks ONE card to add to the compact set. A caller that
+  // repeatedly hits this path (e.g. the layout effect) is bounded by
+  // MAX_COMPACTION_ITERATIONS by the number of asides in the worst case.
   const positionCards = useCallback(() => {
     const margin = marginRef.current;
     const main = mainRef.current;
@@ -99,6 +154,7 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
         const cardEl = cardRefs.current.get(a.id);
         if (!anchorEl || !cardEl) return null;
         const r = anchorEl.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) return null; // hidden (e.g. inside a collapsed Tab)
         return {
           id: a.id,
           cardEl,
@@ -115,34 +171,36 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
     }
 
     const mainHeight = main.offsetHeight;
-    const overflowIds: string[] = [];
-    const cascadeCulprits: string[] = [];
+    const pushedOverflow: Array<{ id: string; height: number }> = [];
+    const pushedCascade: Array<{ id: string; height: number }> = [];
 
-    items.forEach((it, i) => {
+    items.forEach(it => {
       const naturalCentered = it.naturalTop - it.height / 2;
       const desired = Math.max(naturalCentered, cursor);
       it.cardEl.style.top = `${desired}px`;
       it.cardEl.style.visibility = 'visible';
       cursor = desired + it.height + GAP;
       if (desired + it.height > mainHeight) {
-        overflowIds.push(it.id);
+        pushedOverflow.push({ id: it.id, height: it.height });
       }
-      if (i > 0 && desired - naturalCentered > CASCADE_TOLERANCE) {
-        cascadeCulprits.push(items[i - 1].id);
+      if (desired - naturalCentered > CASCADE_TOLERANCE) {
+        pushedCascade.push({ id: it.id, height: it.height });
       }
     });
 
-    let toCompact: string | null = null;
-    if (cascadeCulprits.length > 0) toCompact = cascadeCulprits[0];
-    else if (overflowIds.length > 0) toCompact = overflowIds[overflowIds.length - 1];
+    const current = compactIdsRef.current;
+    // Pick the tallest not-already-compact contributor — compacting it yields
+    // the largest vertical savings and is most likely to fix the cascade in
+    // fewer iterations than blaming a random culprit.
+    const candidates = pushedCascade.length > 0 ? pushedCascade : pushedOverflow;
+    const toCompact = candidates
+      .filter(c => !current.has(c.id))
+      .sort((a, b) => b.height - a.height)[0]?.id;
 
     if (toCompact) {
-      const current = compactIdsRef.current;
-      if (!current.has(toCompact)) {
-        const next = new Set(current);
-        next.add(toCompact);
-        setCompactIds(next);
-      }
+      const next = new Set(current);
+      next.add(toCompact);
+      setCompactIds(next);
     }
   }, []);
 
@@ -172,6 +230,7 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
     setLineGeom({ x1, y1, x2, y2 });
   }, []);
 
+  // Drop stale compact ids when their asides unregister.
   useEffect(() => {
     setCompactIds(prev => {
       if (prev.size === 0) return prev;
@@ -187,15 +246,28 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
     });
   }, [asides]);
 
+  // Position cards after DOM commit. An iteration cap guards against an
+  // unexpected oscillation: if positionCards keeps picking new compactions
+  // beyond MAX_COMPACTION_ITERATIONS, bail.
+  const compactionIterationsRef = useRef(0);
   useIsomorphicLayoutEffect(() => {
+    if (compactionIterationsRef.current > MAX_COMPACTION_ITERATIONS) return;
+    compactionIterationsRef.current += 1;
     positionCards();
   }, [asides, compactIds, positionCards]);
+
+  useEffect(() => {
+    // Reset iteration counter when the aside set changes (new content =
+    // fresh budget).
+    compactionIterationsRef.current = 0;
+  }, [asides]);
 
   useEffect(() => {
     let raf = 0;
     const schedule = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
+        compactionIterationsRef.current = 0;
         positionCards();
         computeLine(hotId);
       });
@@ -223,7 +295,7 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
     if (!mainRef.current) return;
     const collect = () => {
       if (!mainRef.current) return;
-      const els = mainRef.current.querySelectorAll<HTMLElement>('h1[id], h2[id]');
+      const els = mainRef.current.querySelectorAll<HTMLElement>('h1[id], h2[id], h3[id]');
       const list: Heading[] = Array.from(els).map(el => ({
         id: el.id,
         text: el.textContent || '',
@@ -238,19 +310,29 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
     };
     collect();
     let ro: ResizeObserver | undefined;
+    let mo: MutationObserver | undefined;
     if (typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(collect);
       ro.observe(mainRef.current);
     }
+    if (typeof MutationObserver !== 'undefined') {
+      mo = new MutationObserver(collect);
+      mo.observe(mainRef.current, { childList: true, subtree: true });
+    }
     const t = setTimeout(collect, 400);
     return () => {
       ro?.disconnect();
+      mo?.disconnect();
       clearTimeout(t);
     };
   }, []);
 
   useEffect(() => {
-    const onScroll = () => {
+    let rafId = 0;
+    let pending = false;
+
+    const run = () => {
+      pending = false;
       const readerY = window.innerHeight * READING_LINE;
 
       if (mainRef.current) {
@@ -259,9 +341,9 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
         const scrolled = -mRect.top;
         const pct =
           total > 0 ? Math.min(100, Math.max(0, (scrolled / total) * 100)) : scrolled > 0 ? 100 : 0;
-        setProgress(pct);
+        setProgress(prev => (Math.abs(prev - pct) < 0.5 ? prev : pct));
 
-        const headingEls = mainRef.current.querySelectorAll<HTMLElement>('h1[id], h2[id]');
+        const headingEls = mainRef.current.querySelectorAll<HTMLElement>('h1[id], h2[id], h3[id]');
         let activeId: string | null = null;
         headingEls.forEach(h => {
           if (h.getBoundingClientRect().top - readerY < 0) {
@@ -277,6 +359,7 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
         const el = anchorRefs.current.get(a.id);
         if (!el) return;
         const r = el.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) return;
         const mid = r.top + r.height / 2;
         const inView = r.bottom > 0 && r.top < window.innerHeight;
         const dist = Math.abs(mid - readerY);
@@ -287,15 +370,31 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
       });
       setHotId(prev => (prev === best ? prev : best));
     };
+
+    const onScroll = () => {
+      if (pending) return;
+      pending = true;
+      rafId = requestAnimationFrame(run);
+    };
+
     window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
+    run();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(rafId);
+    };
   }, []);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
+    bodyClassRefCount += 1;
     document.body.classList.add('marginalia-active');
-    return () => document.body.classList.remove('marginalia-active');
+    return () => {
+      bodyClassRefCount = Math.max(0, bodyClassRefCount - 1);
+      if (bodyClassRefCount === 0) {
+        document.body.classList.remove('marginalia-active');
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -303,8 +402,8 @@ export default function Marginalia({ children, showToc = true }: MarginaliaProps
   }, [hotId, computeLine]);
 
   const stableApi = useMemo(
-    () => ({ register, unregister, setAnchorRef, setHotId, scrollCardIntoView }),
-    [register, unregister, setAnchorRef, scrollCardIntoView]
+    () => ({ register, unregister, setAnchorRef, setHotId, scrollCardIntoView, getCardId }),
+    [register, unregister, setAnchorRef, scrollCardIntoView, getCardId]
   );
 
   const ctx = useMemo(() => ({ ...stableApi, hotId }), [stableApi, hotId]);
@@ -383,7 +482,14 @@ type CardProps = {
   anchorRefs: React.MutableRefObject<Map<string, HTMLElement>>;
 };
 
-function Card({ aside, hot, compact, setHotId, setCardRef, anchorRefs }: CardProps): JSX.Element {
+const Card = React.memo(function Card({
+  aside,
+  hot,
+  compact,
+  setHotId,
+  setCardRef,
+  anchorRefs,
+}: CardProps): JSX.Element {
   const refCallback = useCallback(
     (el: HTMLDivElement | null) => setCardRef(aside.id, el),
     [setCardRef, aside.id]
@@ -391,9 +497,11 @@ function Card({ aside, hot, compact, setHotId, setCardRef, anchorRefs }: CardPro
   return (
     <div
       ref={refCallback}
+      id={aside.cardId}
+      role="note"
       data-kind={aside.kind || 'note'}
+      data-marginalia-id={aside.id}
       className={clsx(styles.card, hot && styles.hot, compact && styles.compact)}
-      style={{ visibility: 'hidden' }}
       onMouseEnter={() => setHotId(aside.id)}
       onMouseLeave={() => setHotId(null)}
       onClick={() => {
@@ -409,7 +517,7 @@ function Card({ aside, hot, compact, setHotId, setCardRef, anchorRefs }: CardPro
       )}
     </div>
   );
-}
+});
 
 function CompactFace({ aside }: { aside: MarginaliaAside }): JSX.Element {
   return (

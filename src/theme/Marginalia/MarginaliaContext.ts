@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 
 export type MarginaliaAside = {
   id: string;
+  cardId: string;
   kind?: string;
   kindLabel?: string;
   title?: string;
@@ -12,11 +13,12 @@ export type MarginaliaAside = {
 };
 
 export type MarginaliaContextValue = {
-  register: (id: string, data: Omit<MarginaliaAside, 'id'>) => void;
+  register: (id: string, data: Omit<MarginaliaAside, 'id' | 'cardId'>) => void;
   unregister: (id: string) => void;
   setAnchorRef: (id: string, el: HTMLElement | null) => void;
   setHotId: (id: string | null) => void;
   scrollCardIntoView: (id: string) => void;
+  getCardId: (id: string) => string;
   hotId: string | null;
 };
 

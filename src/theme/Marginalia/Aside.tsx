@@ -23,6 +23,8 @@ export type AsideProps = {
   meta?: string[];
   cta?: string;
   ctaHref?: string;
+  /** Optional ARIA label when the anchor content is non-textual. */
+  'aria-label'?: string;
   children?: React.ReactNode;
 };
 
@@ -34,11 +36,12 @@ export default function Aside({
   meta,
   cta,
   ctaHref,
+  'aria-label': ariaLabel,
   children,
 }: AsideProps): JSX.Element {
   const id = useId();
   const ctx = useMarginalia();
-  const anchorElRef = useRef<HTMLSpanElement | null>(null);
+  const anchorElRef = useRef<HTMLButtonElement | null>(null);
 
   const inlineLabel = anchor ?? children;
   const body = anchor ? children : null;
@@ -47,6 +50,7 @@ export default function Aside({
   const register = ctx?.register;
   const unregister = ctx?.unregister;
   const setAnchorRef = ctx?.setAnchorRef;
+  const cardId = ctx?.getCardId(id);
 
   useEffect(() => {
     if (!register) return;
@@ -63,7 +67,7 @@ export default function Aside({
   }, [register, unregister, id, kind, resolvedKindLabel, title, body, meta, cta, ctaHref]);
 
   const refCallback = useCallback(
-    (el: HTMLSpanElement | null) => {
+    (el: HTMLButtonElement | null) => {
       anchorElRef.current = el;
       setAnchorRef?.(id, el);
     },
@@ -72,7 +76,7 @@ export default function Aside({
 
   if (!ctx) {
     return (
-      <span className={styles.anchor} title={title}>
+      <span className={styles.anchor} title={title} aria-label={ariaLabel}>
         {inlineLabel}
       </span>
     );
@@ -81,9 +85,14 @@ export default function Aside({
   const hot = ctx.hotId === id;
   const { setHotId, scrollCardIntoView } = ctx;
 
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   const activate = () => {
     scrollCardIntoView(id);
-    if (anchorElRef.current?.animate) {
+    if (!prefersReducedMotion && anchorElRef.current?.animate) {
       anchorElRef.current.animate(
         [
           { backgroundColor: 'var(--ifm-color-primary)', color: '#fff' },
@@ -94,21 +103,15 @@ export default function Aside({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      activate();
-    }
-  };
-
   return (
-    <span
+    <button
+      type="button"
       ref={refCallback}
       className={clsx(styles.anchor, hot && styles.hot)}
       title={title}
-      role="button"
-      tabIndex={0}
       aria-pressed={hot}
+      aria-describedby={cardId}
+      aria-label={ariaLabel}
       onMouseEnter={() => setHotId(id)}
       onMouseLeave={() => setHotId(null)}
       onFocus={() => setHotId(id)}
@@ -117,9 +120,8 @@ export default function Aside({
         e.preventDefault();
         activate();
       }}
-      onKeyDown={handleKeyDown}
     >
       {inlineLabel}
-    </span>
+    </button>
   );
 }

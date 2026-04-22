@@ -14,6 +14,7 @@ function makeCtx(overrides: Partial<MarginaliaContextValue> = {}): MarginaliaCon
     setAnchorRef: vi.fn(),
     setHotId: vi.fn(),
     scrollCardIntoView: vi.fn(),
+    getCardId: (id: string) => `marginalia-card-${id.replace(/[:]/g, '_')}`,
     hotId: null,
     ...overrides,
   };
@@ -36,7 +37,7 @@ describe('Aside (standalone, no provider)', () => {
 });
 
 describe('Aside (inside provider)', () => {
-  it('renders as an interactive button-role span and registers with the context', () => {
+  it('renders as a real <button> and registers with the context', () => {
     const ctx = makeCtx();
     render(
       <MarginaliaContext.Provider value={ctx}>
@@ -47,9 +48,11 @@ describe('Aside (inside provider)', () => {
     );
 
     const el = screen.getByRole('button', { name: 'hover me' });
-    expect(el).toHaveAttribute('tabindex', '0');
+    expect(el.tagName).toBe('BUTTON');
+    expect(el).toHaveAttribute('type', 'button');
     expect(el).toHaveAttribute('title', 'Context title');
     expect(el).toHaveAttribute('aria-pressed', 'false');
+    expect(el).toHaveAttribute('aria-describedby', expect.stringMatching(/^marginalia-card-/));
     expect(ctx.register).toHaveBeenCalledTimes(1);
     expect(ctx.register).toHaveBeenCalledWith(
       expect.any(String),

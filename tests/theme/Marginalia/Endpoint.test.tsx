@@ -30,4 +30,28 @@ describe('Endpoint', () => {
       expect(container.querySelector('[data-method]')).toHaveAttribute('data-method', method);
     }
   );
+
+  it('upper-cases an unknown method and renders it verbatim', () => {
+    const { container } = render(<Endpoint method="query" path="/graphql" />);
+    expect(container.querySelector('[data-method]')).toHaveAttribute('data-method', 'QUERY');
+    expect(screen.getByText('QUERY')).toBeInTheDocument();
+  });
+
+  it('prefers path over children when both are provided', () => {
+    render(
+      <Endpoint method="GET" path="/from-prop">
+        /from-children
+      </Endpoint>
+    );
+    expect(screen.getByText('/from-prop')).toBeInTheDocument();
+    expect(screen.queryByText('/from-children')).not.toBeInTheDocument();
+  });
+
+  it('renders an empty path container when neither path nor children are provided', () => {
+    const { container } = render(<Endpoint method="GET" />);
+    const chip = container.querySelector('[data-method]');
+    expect(chip).toHaveAttribute('data-method', 'GET');
+    // Method text still renders; path span exists but is empty.
+    expect(screen.getByText('GET')).toBeInTheDocument();
+  });
 });

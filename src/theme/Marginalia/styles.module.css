@@ -22,12 +22,32 @@
   --marginalia-font-serif: var(--ifm-font-family-base, system-ui, -apple-system, sans-serif);
   --marginalia-navbar-offset: var(--ifm-navbar-height, 60px);
 
+  /* Endpoint method tokens. Overridable per-site; dark-mode variants live in
+     the [data-theme='dark'] block below. */
+  --marginalia-method-get-fg: #1e8a5a;
+  --marginalia-method-get-bg: #e2f3ea;
+  --marginalia-method-post-fg: #c97b1f;
+  --marginalia-method-post-bg: #faf0dd;
+  --marginalia-method-put-fg: var(--marginalia-accent-strong);
+  --marginalia-method-put-bg: color-mix(in oklab, var(--marginalia-accent) 12%, transparent);
+  --marginalia-method-delete-fg: #c0423e;
+  --marginalia-method-delete-bg: #fbe7e6;
+
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 48px;
   align-items: start;
   margin: 2rem 0;
+}
+
+:global([data-theme='dark']) .wrap {
+  --marginalia-method-get-fg: #7cd3a5;
+  --marginalia-method-get-bg: rgba(30, 138, 90, 0.22);
+  --marginalia-method-post-fg: #f3c177;
+  --marginalia-method-post-bg: rgba(201, 123, 31, 0.22);
+  --marginalia-method-delete-fg: #f1827f;
+  --marginalia-method-delete-bg: rgba(192, 66, 62, 0.25);
 }
 
 .main {
@@ -143,6 +163,18 @@
 /* ---- Inline anchor ---- */
 
 .anchor {
+  /* Reset default button chrome so the anchor sits inline with prose. */
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  color: inherit;
+  display: inline;
+  vertical-align: baseline;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  line-height: inherit;
+
   cursor: pointer;
   border-bottom: 1px dashed color-mix(in oklab, var(--marginalia-accent) 45%, transparent);
   background: transparent;
@@ -182,13 +214,15 @@
   opacity: 0.68;
   transform: translateX(0);
   cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  visibility: hidden; /* positionCards flips to 'visible' via imperative style */
   scroll-margin-top: calc(var(--marginalia-navbar-offset) + 100px);
   transition:
     transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
     opacity 0.25s ease,
     border-color 0.2s ease,
     box-shadow 0.2s ease;
-  will-change: transform, opacity, top;
 }
 
 .card.hot {
@@ -402,24 +436,24 @@
 }
 
 .endpoint[data-method='GET'] .endpointMethod {
-  color: #1e8a5a;
-  background: #e2f3ea;
+  color: var(--marginalia-method-get-fg);
+  background: var(--marginalia-method-get-bg);
 }
 
 .endpoint[data-method='POST'] .endpointMethod {
-  color: #c97b1f;
-  background: #faf0dd;
+  color: var(--marginalia-method-post-fg);
+  background: var(--marginalia-method-post-bg);
 }
 
 .endpoint[data-method='PUT'] .endpointMethod,
 .endpoint[data-method='PATCH'] .endpointMethod {
-  color: var(--marginalia-accent-strong);
-  background: color-mix(in oklab, var(--marginalia-accent) 12%, transparent);
+  color: var(--marginalia-method-put-fg);
+  background: var(--marginalia-method-put-bg);
 }
 
 .endpoint[data-method='DELETE'] .endpointMethod {
-  color: #c0423e;
-  background: #fbe7e6;
+  color: var(--marginalia-method-delete-fg);
+  background: var(--marginalia-method-delete-bg);
 }
 
 .endpointPath {
@@ -438,5 +472,49 @@
   }
   .lineLayer {
     display: none;
+  }
+}
+
+/* ---- Reduced motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+  .line {
+    animation: none;
+  }
+  .progress > span {
+    transition: none;
+  }
+  .anchor {
+    transition: none;
+  }
+  .tocItem a {
+    transition: none;
+  }
+}
+
+/* ---- Print ---- */
+
+@media print {
+  .wrap {
+    display: block;
+  }
+  .margin {
+    display: block;
+    position: static;
+  }
+  .toc,
+  .lineLayer {
+    display: none;
+  }
+  .card {
+    position: static;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transform: none !important;
+    page-break-inside: avoid;
+    margin: 0.5rem 0;
   }
 }
