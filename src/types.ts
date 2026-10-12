@@ -6,13 +6,6 @@ export type MarginaliaOptions = {
 };
 
 export type AsideKind =
-  | 'note'
-  | 'concept'
-  | 'warning'
-  | 'info'
-  | 'link'
-  | 'value'
-  | 'code'
-  | 'endpoint';
+  'note' | 'concept' | 'warning' | 'info' | 'link' | 'value' | 'code' | 'endpoint';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | (string & {});
