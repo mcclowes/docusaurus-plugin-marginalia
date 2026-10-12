@@ -4,6 +4,12 @@
 > in the right margin that pack top-down, highlight as the reader scrolls, and
 > collapse gracefully on narrow viewports.
 
+## Compatibility
+
+| Plugin version | Docusaurus                       | React | Node   |
+| -------------- | -------------------------------- | ----- | ------ |
+| `0.1.x`        | `^3.0.0` (tested up to `3.10.1`) | `^18` | `>=18` |
+
 ## Install
 
 ```bash
