@@ -12,8 +12,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-publish
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -28,6 +28,13 @@ jobs:
           fetch-depth: 2
           fetch-tags: true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
       - name: Determine version
         id: version
         run: |
@@ -35,52 +42,30 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Check if already published
+      - name: Check release state
         id: check
         env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Setup Node.js
-        if: steps.check.outputs.skip == 'false'
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/check-release-state.ts
 
       - name: Upgrade npm for OIDC support
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.published == 'false'
         run: npm install -g npm@11
 
       - name: Install dependencies
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.published == 'false'
         run: npm ci --ignore-scripts
 
       - name: Build package
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.published == 'false'
         run: npm run build
 
       - name: Run tests
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.published == 'false'
         run: npm test
 
-      - name: Create and push tag
-        if: steps.check.outputs.skip == 'false'
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          git tag "$TAG"
-          git push origin "$TAG"
-
       - name: Publish to npm with provenance
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.published == 'false'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -90,8 +75,16 @@ jobs:
             npm publish --provenance --access public
           fi
 
+      - name: Create and push tag
+        if: steps.check.outputs.tagged == 'false'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
       - name: Create GitHub Release
-        if: steps.check.outputs.skip == 'false'
+        if: steps.check.outputs.released == 'false'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
