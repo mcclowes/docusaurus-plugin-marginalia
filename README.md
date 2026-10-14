@@ -8,7 +8,7 @@
 
 | Plugin version | Docusaurus                       | React | Node   |
 | -------------- | -------------------------------- | ----- | ------ |
-| `0.1.x`        | `^3.0.0` (tested up to `3.10.1`) | `^18` | `>=18` |
+| `0.1.x`        | `^3.0.0` (tested up to `3.10.1`) | `^18` | `>=20` |
 
 ## Install
 
@@ -142,6 +142,21 @@ The components are exposed under `@theme/Marginalia`, so any can be swizzled:
 
 ```bash
 npm run swizzle docusaurus-plugin-marginalia Marginalia/Aside -- --eject
+```
+
+## Development
+
+The consumer runtime minimum above differs from the locked test-tool requirements.
+Local development needs Node 22.22.2+ on the 22.x line, Node 24.15+ on the 24.x
+line, or Node 26+. Use a current Node 24 release to match CI; CI also tests Node 22.
+
+```bash
+npm ci
+npm run build
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
 ```
 
 ## License
