@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Release retries now complete missing npm publication, remote tags, and GitHub Releases independently. State-check failures stop the release, publication precedes tagging, and concurrent release runs no longer cancel active publication.
+- Release and version-bump workflows now quote output paths and pass inputs through environment variables; publishing uses npm 11 on the existing Node 24 runtime.
 - `getTypeScriptThemePath` returning an invalid path for npm-installed consumers (`src/theme` was stripped by `.npmignore`).
 - Release workflow no longer silently skips tag pushes (the `paths` filter previously blocked them).
 - Removed dead defensive `try/catch` around `typeof __dirname` checks in plugin resolvers.
